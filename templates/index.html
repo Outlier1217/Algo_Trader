@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Algo Trader Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        :root {
+            --bg: #0b1120;
+            --card: #020617;
+            --muted: #94a3b8;
+            --text: #e5e7eb;
+            --blue: #3b82f6;
+            --green: #22c55e;
+            --red: #ef4444;
+            --yellow: #eab308;
+            --border: #1e293b;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont;
+            background: linear-gradient(180deg, #020617, #0b1120);
+            color: var(--text);
+        }
+
+        header {
+            padding: 20px 40px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        header h1 {
+            font-size: 22px;
+            margin: 0;
+            font-weight: 600;
+        }
+
+        main {
+            max-width: 1100px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 22px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .price {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+
+        .muted {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .signal {
+            font-size: 22px;
+            font-weight: 700;
+            margin-top: 8px;
+        }
+
+        .buy { color: var(--green); }
+        .sell { color: var(--red); }
+        .hold { color: var(--yellow); }
+
+        .outlook {
+            margin-top: 8px;
+            font-size: 14px;
+        }
+
+        form {
+            margin-top: 15px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        label {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        input {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #020617;
+            color: var(--text);
+            outline: none;
+        }
+
+        input:focus { border-color: var(--blue); }
+
+        .full { grid-column: span 2; }
+
+        button {
+            padding: 12px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .btn-primary { background: var(--blue); color: white; }
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .note {
+            background: #020617;
+            border: 1px dashed var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            line-height: 1.7;
+        }
+
+        .disclaimer {
+            margin-bottom: 20px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            background: linear-gradient(90deg, #7c2d12, #991b1b);
+            border: 1px solid #ef4444;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+
+        .disclaimer strong {
+            color: #fecaca;
+            font-size: 16px;
+        }
+
+        .disclaimer p {
+            margin-top: 8px;
+            color: #fee2e2;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+
+    <!-- DISCLAIMER -->
+    <div class="disclaimer">
+        <strong>⚠️ IMPORTANT DISCLAIMER</strong>
+        <p>
+            This Algo Trader is strictly for <strong>educational and training purposes only</strong>.<br>
+            <strong>Please do NOT take any real trades using this bot.</strong><br>
+            Trading with this system can lead to <strong>huge financial losses</strong>.<br>
+            Use this project only to understand algorithmic trading, machine learning, and backtesting concepts.
+        </p>
+    </div>
+
+    <h1>🚀 Algo Trader — Bitcoin AI Model</h1>
+    <span class="muted">Hybrid PPO + LSTM System</span>
+
+</header>
+
+<main>
+
+    <div class="grid">
+
+        <!-- Market Snapshot -->
+        <div class="card">
+            <h2>📊 Market Snapshot</h2>
+            <div class="muted">Current BTC Price</div>
+            <div class="price">${{ price }}</div>
+
+            <div class="signal">
+                {% if signal == 'BUY' %}
+                    <span class="buy">BUY</span>
+                {% elif signal == 'SELL' %}
+                    <span class="sell">SELL</span>
+                {% else %}
+                    <span class="hold">HOLD</span>
+                {% endif %}
+            </div>
+
+            <div class="outlook muted">
+                {% if signal == 'BUY' %}
+                    Bullish momentum expected 📈
+                {% elif signal == 'SELL' %}
+                    Bearish pressure expected 📉
+                {% else %}
+                    Market consolidation / sideways ⚖️
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Backtest -->
+        <div class="card">
+            <h2>🏃 Run Backtest</h2>
+
+            <form action="/run-backtest" method="POST">
+                <div>
+                    <label>Initial Capital (INR)</label>
+                    <input type="number" name="initial_inr" value="100000" min="1000" required>
+                </div>
+
+                <div>
+                    <label>Max Loss (%)</label>
+                    <input type="number" name="max_loss" value="10" min="1" max="50" required>
+                </div>
+
+                <div class="full">
+                    <button type="submit" class="btn-primary">▶ Run Backtest</button>
+                </div>
+
+                <div class="full">
+                    <a href="/backtests">
+                        <button type="button" class="btn-secondary">📈 View Backtest History</button>
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Model Explanation -->
+        <div class="card full">
+            <h2>🧠 Model Explanation</h2>
+            <div class="note">
+                <p><strong>Architecture:</strong> This is a hybrid system combining <strong>Deep Learning</strong> and <strong>Deep Reinforcement Learning</strong>.</p>
+
+                <p><strong>LSTM (Deep Learning):</strong>  
+                The LSTM model predicts short-term market returns using sequential price and technical indicators.  
+                Training converged smoothly, with both training and validation loss stabilizing around <strong>0.0025</strong>, indicating strong generalization and minimal overfitting.</p>
+
+                <p><strong>PPO (Reinforcement Learning):</strong>  
+                The PPO agent uses the LSTM’s predictions as part of its state and learns optimal trading actions (Buy / Sell / Hold).  
+                Training showed <strong>low KL divergence</strong> and <strong>stable entropy</strong>, reflecting controlled and stable learning behavior in a stochastic market.</p>
+
+                <p><strong>Training Outcome:</strong>  
+                Over <strong>300,000 timesteps</strong>, the PPO agent achieved an approximate <strong>+44% portfolio return</strong> during training.</p>
+
+                <p><strong>Key Idea:</strong>  
+                <em>LSTM predicts what may happen next, PPO decides what action to take.</em>  
+                This separation of prediction and decision-making creates a robust and realistic trading framework.</p>
+            </div>
+        </div>
+
+    </div>
+
+</main>
+
+<footer>
+    Algo Trader • Educational & Research Use Only • No Financial Advice
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,10 @@
+flask
+psycopg2-binary
+python-dotenv
+ccxt
+stable-baselines3
+gymnasium
+numpy
+pandas
+yfinance
+tensorflow  # New for LSTM load

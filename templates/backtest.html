@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Backtest Results</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        body {
+            margin: 0;
+            font-family: "Inter", system-ui;
+            background: linear-gradient(180deg, #020617, #0b1120);
+            color: #e5e7eb;
+        }
+
+        header {
+            padding: 20px 40px;
+            border-bottom: 1px solid #1e293b;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 600;
+        }
+
+        main {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        a {
+            color: #38bdf8;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: #020617;
+            border-radius: 14px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 14px 12px;
+            border-bottom: 1px solid #1e293b;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        th {
+            background: #020617;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: rgba(59,130,246,0.05);
+        }
+
+        .pos { color: #22c55e; font-weight: 600; }
+        .neg { color: #ef4444; font-weight: 600; }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #94a3b8;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>📈 Backtesting History</h1>
+    <a href="/">⬅ Back to Dashboard</a>
+</header>
+
+<main>
+
+    <table>
+        <tr>
+            <th>Timestamp</th>
+            <th>Initial Balance</th>
+            <th>Final Balance</th>
+            <th>Return (%)</th>
+            <th>Max Drawdown (%)</th>
+            <th>Notes</th>
+        </tr>
+
+        {% for r in results %}
+        <tr>
+            <td>{{ r[0] }}</td>
+            <td>{{ r[1] }}</td>
+            <td>{{ r[2] }}</td>
+
+            {% if r[3] >= 0 %}
+                <td class="pos">{{ "%.2f"|format(r[3]) }}</td>
+            {% else %}
+                <td class="neg">{{ "%.2f"|format(r[3]) }}</td>
+            {% endif %}
+
+            <td>{{ "%.2f"|format(r[4]) }}</td>
+            <td>{{ r[5] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+</main>
+
+<footer>
+    Algo Trader • Backtest Results • Research Purpose Only
+</footer>
+
+</body>
+</html>
