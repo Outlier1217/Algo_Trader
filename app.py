@@ -11,6 +11,7 @@ import gymnasium as gym
 from tensorflow.keras.models import load_model
 import pickle
 import warnings
+import time
 
 warnings.filterwarnings("ignore")
 
@@ -22,6 +23,8 @@ app = Flask(__name__)
 
 LOOKBACK = 60
 LEVERAGE = 5
+CACHE_FILE = "df_cache.pkl"
+CACHE_MAX_AGE = 600  # 10 Minutes cache for heavy indicators
 
 # PPO training columns (LOCKED)
 OBS_COLUMNS = [
@@ -35,9 +38,7 @@ OBS_COLUMNS = [
     "lstm_pred_return"
 ]
 
-OBS_SIZE = LOOKBACK * len(OBS_COLUMNS) + 4  # 1024
-
-CACHE_FILE = "df_cache.pkl"  # Cache file for fast loading
+OBS_SIZE = LOOKBACK * len(OBS_COLUMNS) + 4
 
 # ==================================================
 # DB CONNECTION
@@ -61,11 +62,26 @@ with open("btc_scaler.pkl", "rb") as f:
     scaler = pickle.load(f)
 
 # ==================================================
+# LIVE PRICE HELPER (FRESH FETCH)
+# ==================================================
+def get_live_btc_price():
+    """Fetches only the latest price without processing indicators."""
+    try:
+        # ticker.fast_info['last_price'] is the fastest way
+        ticker = yf.Ticker("BTC-USD")
+        data = ticker.history(period="1d", interval="1m")
+        if not data.empty:
+            return round(float(data['Close'].iloc[-1]), 2)
+        return 0.0
+    except Exception as e:
+        print(f"Live Price Error: {e}")
+        return 0.0
+
+# ==================================================
 # TECHNICAL INDICATORS
 # ==================================================
 def add_indicators(df):
     df = df.copy()
-
     df["ma10"] = df["close"].rolling(10).mean()
     df["ma50"] = df["close"].rolling(50).mean()
     df["ema12"] = df["close"].ewm(span=12, adjust=False).mean()
@@ -74,8 +90,8 @@ def add_indicators(df):
     df["macd_signal"] = df["macd"].ewm(span=9).mean()
 
     delta = df["close"].diff()
-    gain = delta.clip(lower=0).rolling(14).mean()
-    loss = -delta.clip(upper=0).rolling(14).mean()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
     rs = gain / loss
     df["rsi"] = 100 - (100 / (1 + rs))
 
@@ -83,12 +99,11 @@ def add_indicators(df):
     std = df["close"].rolling(20).std()
     df["bb_upper"] = df["bb_middle"] + 2 * std
     df["bb_lower"] = df["bb_middle"] - 2 * std
-
     df["volume_sma20"] = df["volume"].rolling(20).mean()
     return df
 
 # ==================================================
-# LSTM PREDICTION FUNCTION
+# LSTM PREDICTION
 # ==================================================
 LSTM_FEATURES = [
     "close", "volume", "ma10", "ma50",
@@ -104,27 +119,25 @@ def lstm_pred_return(idx, df):
         seq = df[LSTM_FEATURES].iloc[idx-LOOKBACK:idx].values
         seq_scaled = scaler.transform(seq).reshape(1, LOOKBACK, len(LSTM_FEATURES))
         pred_scaled = lstm_model.predict(seq_scaled, verbose=0)[0][0]
-
         dummy = np.zeros((1, len(LSTM_FEATURES)))
         dummy[0, 0] = pred_scaled
         pred_price = scaler.inverse_transform(dummy)[0, 0]
-
         cur = df.iloc[idx]["close"]
         return (pred_price - cur) / cur if cur > 0 else 0.0
     except:
         return 0.0
 
 # ==================================================
-# LOAD AND PROCESS DATA WITH CACHE
+# LOAD AND PROCESS DATA (CACHED)
 # ==================================================
 def load_and_process_data():
     if os.path.exists(CACHE_FILE):
-        print("Loading cached data from df_cache.pkl...")
-        return pd.read_pickle(CACHE_FILE)
-    
-    print("Downloading fresh BTC data and processing...")
-    df = yf.download("BTC-USD", period="6mo", interval="1h")
+        cache_time = os.path.getmtime(CACHE_FILE)
+        if time.time() - cache_time < CACHE_MAX_AGE:
+            return pd.read_pickle(CACHE_FILE)
 
+    print("Refreshing heavy data cache...")
+    df = yf.download("BTC-USD", period="7d", interval="1h")
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = [c[0].lower() for c in df.columns]
     else:
@@ -132,22 +145,14 @@ def load_and_process_data():
 
     df.dropna(inplace=True)
     df.reset_index(drop=True, inplace=True)
-
     df = add_indicators(df)
     df.dropna(inplace=True)
     df.reset_index(drop=True, inplace=True)
-
-    print("Computing LSTM predictions (this may take 2-5 minutes first time)...")
     df["lstm_pred_return"] = [lstm_pred_return(i, df) for i in range(len(df))]
-
     df = df[OBS_COLUMNS].copy()
     df.dropna(inplace=True)
     df.reset_index(drop=True, inplace=True)
-
-    # Save cache
     df.to_pickle(CACHE_FILE)
-    print("Data processed and cached successfully!")
-
     return df
 
 # ==================================================
@@ -167,11 +172,8 @@ class HybridBitcoinFuturesEnv(gym.Env):
         self.position = 0
         self.entry_price = 0.0
         self.trade_capital_pct = 0.1
-
         self.action_space = gym.spaces.Discrete(3)
-        self.observation_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf, shape=(OBS_SIZE,), dtype=np.float32
-        )
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(OBS_SIZE,), dtype=np.float32)
 
     def reset(self, seed=None):
         self.balance = self.initial_balance
@@ -181,13 +183,8 @@ class HybridBitcoinFuturesEnv(gym.Env):
         return self._get_obs(), {}
 
     def _get_obs(self):
-        window = self.df.iloc[self.current_step - self.lookback:self.current_step].values.flatten()
-        extra = np.array([
-            self.balance / self.initial_balance,
-            float(self.position),
-            0.0,
-            self.df.iloc[self.current_step]["lstm_pred_return"]
-        ])
+        window = self.df.iloc[self.current_step - self.lookback : self.current_step].values.flatten()
+        extra = np.array([self.balance / self.initial_balance, float(self.position), 0.0, self.df.iloc[self.current_step]["lstm_pred_return"]])
         obs = np.concatenate([window, extra])
         return np.nan_to_num(obs).astype(np.float32)
 
@@ -195,7 +192,6 @@ class HybridBitcoinFuturesEnv(gym.Env):
         price = float(self.df.iloc[self.current_step]["close"])
         reward = 0.0
         trade_capital = self.balance * self.trade_capital_pct
-
         if action == 1 and self.position == 0:
             self.position = 1
             self.entry_price = price
@@ -205,22 +201,12 @@ class HybridBitcoinFuturesEnv(gym.Env):
 
         if self.position != 0:
             pnl_pct = (price - self.entry_price) / self.entry_price
-            if self.position == -1:
-                pnl_pct = -pnl_pct
-            pnl = pnl_pct * trade_capital * self.leverage
-            self.balance += pnl
-            reward = pnl
+            if self.position == -1: pnl_pct = -pnl_pct
+            self.balance += pnl_pct * trade_capital * self.leverage
 
-        if self.balance <= self.min_balance:
-            self.balance = self.min_balance
-            done = True
-        else:
-            done = False
-
+        done = self.balance <= self.min_balance
         self.current_step += 1
-        if self.current_step >= len(self.df) - 1:
-            done = True
-
+        if self.current_step >= len(self.df) - 1: done = True
         return self._get_obs(), reward, done, False, {}
 
 # ==================================================
@@ -228,55 +214,44 @@ class HybridBitcoinFuturesEnv(gym.Env):
 # ==================================================
 @app.route("/")
 def dashboard():
-    df = load_and_process_data()  # Fresh or cached
+    df = load_and_process_data()
+    live_price = get_live_btc_price()  # Humesha fresh price
+    
     env = HybridBitcoinFuturesEnv(df, 100000, 10)
     obs, _ = env.reset()
     action, _ = ppo_model.predict(obs, deterministic=True)
-
     signal = {0: "HOLD", 1: "BUY", 2: "SELL"}[int(action)]
-    price = round(float(df.iloc[-1]["close"]), 2)
-
-    return render_template("index.html", price=price, signal=signal)
+    
+    return render_template("index.html", price=live_price, signal=signal)
 
 @app.route("/run-backtest", methods=["POST"])
 def run_backtest():
     initial_inr = float(request.form["initial_inr"])
     max_loss = float(request.form["max_loss"])
-
     df = load_and_process_data()
-
     env = HybridBitcoinFuturesEnv(df, initial_balance=initial_inr, max_loss_pct=max_loss)
     obs, _ = env.reset()
     done = False
     actions = []
-
     while not done:
         action, _ = ppo_model.predict(obs, deterministic=True)
         obs, reward, done, _, _ = env.step(int(action))
         actions.append(int(action))
-
+    
     final_balance = env.balance
     total_return = ((final_balance - initial_inr) / initial_inr) * 100
-
-    if actions:
-        unique, counts = np.unique(actions, return_counts=True)
-        action_map = {0: 'Hold', 1: 'Long', 2: 'Short'}
-        total = len(actions)
-        dist = {action_map.get(a, 'Unknown'): round(c / total * 100, 1) for a, c in zip(unique, counts)}
-    else:
-        dist = {'Hold': 0.0, 'Long': 0.0, 'Short': 0.0}
+    unique, counts = np.unique(actions, return_counts=True) if actions else ([], [])
+    action_map = {0: 'Hold', 1: 'Long', 2: 'Short'}
+    total = len(actions) if actions else 1
+    dist = {action_map.get(a, 'Unknown'): (c / total * 100) for a, c in zip(unique, counts)}
 
     conn = get_db_conn()
     cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO backtest_results
-        (initial_balance, final_balance, total_return, max_drawdown, actions_json, notes)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """, (initial_inr, final_balance, total_return, max_loss, json.dumps(dist), "Hybrid PPO + LSTM"))
+    cur.execute("INSERT INTO backtest_results (initial_balance, final_balance, total_return, max_drawdown, actions_json, notes) VALUES (%s, %s, %s, %s, %s, %s)", 
+                (initial_inr, final_balance, total_return, max_loss, json.dumps(dist), "Hybrid PPO + LSTM"))
     conn.commit()
     cur.close()
     conn.close()
-
     return redirect(url_for("backtests"))
 
 @app.route("/backtests")
@@ -294,16 +269,20 @@ def backtests():
     results = []
     for row in rows:
         timestamp, initial, final, ret, max_dd, notes, actions_json = row
-        dist = {"Hold": 0.0, "Long": 0.0, "Short": 0.0}
+
+        # Super safe JSON parsing
+        dist = {"Hold": 0.0, "Long": 0.0, "Short": 0.0}  # Default safe dict
+
         if actions_json:
             try:
                 parsed = json.loads(actions_json)
                 if isinstance(parsed, dict):
+                    # Update only valid keys
                     dist["Hold"] = float(parsed.get("Hold", 0.0))
                     dist["Long"] = float(parsed.get("Long", 0.0))
                     dist["Short"] = float(parsed.get("Short", 0.0))
-            except:
-                pass
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass  # Agar kuch galat hai to default hi rahega
 
         results.append({
             "timestamp": timestamp,
