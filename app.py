@@ -37,6 +37,8 @@ OBS_COLUMNS = [
 
 OBS_SIZE = LOOKBACK * len(OBS_COLUMNS) + 4  # 1024
 
+CACHE_FILE = "df_cache.pkl"  # Cache file for fast loading
+
 # ==================================================
 # DB CONNECTION
 # ==================================================
@@ -57,19 +59,6 @@ lstm_model = load_model("btc_lstm_predictor.keras")
 
 with open("btc_scaler.pkl", "rb") as f:
     scaler = pickle.load(f)
-
-# ==================================================
-# LOAD BTC DATA
-# ==================================================
-df = yf.download("BTC-USD", period="6mo", interval="1h")
-
-if isinstance(df.columns, pd.MultiIndex):
-    df.columns = [c[0].lower() for c in df.columns]
-else:
-    df.columns = df.columns.str.lower()
-
-df.dropna(inplace=True)
-df.reset_index(drop=True, inplace=True)
 
 # ==================================================
 # TECHNICAL INDICATORS
@@ -98,12 +87,8 @@ def add_indicators(df):
     df["volume_sma20"] = df["volume"].rolling(20).mean()
     return df
 
-df = add_indicators(df)
-df.dropna(inplace=True)
-df.reset_index(drop=True, inplace=True)
-
 # ==================================================
-# LSTM PREDICTION
+# LSTM PREDICTION FUNCTION
 # ==================================================
 LSTM_FEATURES = [
     "close", "volume", "ma10", "ma50",
@@ -112,7 +97,7 @@ LSTM_FEATURES = [
     "volume_sma20"
 ]
 
-def lstm_pred_return(idx):
+def lstm_pred_return(idx, df):
     if idx < LOOKBACK:
         return 0.0
     try:
@@ -129,40 +114,63 @@ def lstm_pred_return(idx):
     except:
         return 0.0
 
-df["lstm_pred_return"] = [lstm_pred_return(i) for i in range(len(df))]
+# ==================================================
+# LOAD AND PROCESS DATA WITH CACHE
+# ==================================================
+def load_and_process_data():
+    if os.path.exists(CACHE_FILE):
+        print("Loading cached data from df_cache.pkl...")
+        return pd.read_pickle(CACHE_FILE)
+    
+    print("Downloading fresh BTC data and processing...")
+    df = yf.download("BTC-USD", period="6mo", interval="1h")
 
-df = df[OBS_COLUMNS].copy()
-df.dropna(inplace=True)
-df.reset_index(drop=True, inplace=True)
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [c[0].lower() for c in df.columns]
+    else:
+        df.columns = df.columns.str.lower()
+
+    df.dropna(inplace=True)
+    df.reset_index(drop=True, inplace=True)
+
+    df = add_indicators(df)
+    df.dropna(inplace=True)
+    df.reset_index(drop=True, inplace=True)
+
+    print("Computing LSTM predictions (this may take 2-5 minutes first time)...")
+    df["lstm_pred_return"] = [lstm_pred_return(i, df) for i in range(len(df))]
+
+    df = df[OBS_COLUMNS].copy()
+    df.dropna(inplace=True)
+    df.reset_index(drop=True, inplace=True)
+
+    # Save cache
+    df.to_pickle(CACHE_FILE)
+    print("Data processed and cached successfully!")
+
+    return df
 
 # ==================================================
-# RL ENVIRONMENT (STABLE & REALISTIC)
+# RL ENVIRONMENT
 # ==================================================
 class HybridBitcoinFuturesEnv(gym.Env):
     def __init__(self, df, initial_balance, max_loss_pct):
         super().__init__()
-
         self.df = df
         self.initial_balance = initial_balance
         self.balance = initial_balance
         self.max_loss_pct = max_loss_pct / 100
-
         self.min_balance = initial_balance * (1 - self.max_loss_pct)
-
         self.leverage = LEVERAGE
         self.lookback = LOOKBACK
         self.current_step = None
-
         self.position = 0
         self.entry_price = 0.0
-        self.trade_capital_pct = 0.1  # 10% per trade
+        self.trade_capital_pct = 0.1
 
         self.action_space = gym.spaces.Discrete(3)
         self.observation_space = gym.spaces.Box(
-            low=-np.inf,
-            high=np.inf,
-            shape=(OBS_SIZE,),
-            dtype=np.float32
+            low=-np.inf, high=np.inf, shape=(OBS_SIZE,), dtype=np.float32
         )
 
     def reset(self, seed=None):
@@ -173,30 +181,24 @@ class HybridBitcoinFuturesEnv(gym.Env):
         return self._get_obs(), {}
 
     def _get_obs(self):
-        window = self.df.iloc[
-            self.current_step - self.lookback : self.current_step
-        ].values.flatten()
-
+        window = self.df.iloc[self.current_step - self.lookback:self.current_step].values.flatten()
         extra = np.array([
             self.balance / self.initial_balance,
             float(self.position),
             0.0,
             self.df.iloc[self.current_step]["lstm_pred_return"]
         ])
-
         obs = np.concatenate([window, extra])
         return np.nan_to_num(obs).astype(np.float32)
 
     def step(self, action):
         price = float(self.df.iloc[self.current_step]["close"])
         reward = 0.0
-
         trade_capital = self.balance * self.trade_capital_pct
 
         if action == 1 and self.position == 0:
             self.position = 1
             self.entry_price = price
-
         elif action == 2 and self.position == 0:
             self.position = -1
             self.entry_price = price
@@ -205,12 +207,10 @@ class HybridBitcoinFuturesEnv(gym.Env):
             pnl_pct = (price - self.entry_price) / self.entry_price
             if self.position == -1:
                 pnl_pct = -pnl_pct
-
             pnl = pnl_pct * trade_capital * self.leverage
             self.balance += pnl
             reward = pnl
 
-        # 🔒 ACCOUNT LEVEL STOP LOSS
         if self.balance <= self.min_balance:
             self.balance = self.min_balance
             done = True
@@ -223,13 +223,12 @@ class HybridBitcoinFuturesEnv(gym.Env):
 
         return self._get_obs(), reward, done, False, {}
 
-
-
 # ==================================================
 # ROUTES
 # ==================================================
 @app.route("/")
 def dashboard():
+    df = load_and_process_data()  # Fresh or cached
     env = HybridBitcoinFuturesEnv(df, 100000, 10)
     obs, _ = env.reset()
     action, _ = ppo_model.predict(obs, deterministic=True)
@@ -244,33 +243,28 @@ def run_backtest():
     initial_inr = float(request.form["initial_inr"])
     max_loss = float(request.form["max_loss"])
 
-    env = HybridBitcoinFuturesEnv(
-        df,
-        initial_balance=initial_inr,
-        max_loss_pct=max_loss
-    )
+    df = load_and_process_data()
 
+    env = HybridBitcoinFuturesEnv(df, initial_balance=initial_inr, max_loss_pct=max_loss)
     obs, _ = env.reset()
     done = False
-
-    actions = []  # Collect actions during backtest
+    actions = []
 
     while not done:
         action, _ = ppo_model.predict(obs, deterministic=True)
         obs, reward, done, _, _ = env.step(int(action))
-        actions.append(int(action))  # Record the action
+        actions.append(int(action))
 
     final_balance = env.balance
     total_return = ((final_balance - initial_inr) / initial_inr) * 100
 
-    # Compute action distribution
     if actions:
         unique, counts = np.unique(actions, return_counts=True)
         action_map = {0: 'Hold', 1: 'Long', 2: 'Short'}
-        total_actions = len(actions)
-        dist = {action_map.get(a, 'Unknown'): (c / total_actions * 100) for a, c in zip(unique, counts)}
+        total = len(actions)
+        dist = {action_map.get(a, 'Unknown'): round(c / total * 100, 1) for a, c in zip(unique, counts)}
     else:
-        dist = {'Hold': 0, 'Long': 0, 'Short': 0}
+        dist = {'Hold': 0.0, 'Long': 0.0, 'Short': 0.0}
 
     conn = get_db_conn()
     cur = conn.cursor()
@@ -278,20 +272,12 @@ def run_backtest():
         INSERT INTO backtest_results
         (initial_balance, final_balance, total_return, max_drawdown, actions_json, notes)
         VALUES (%s, %s, %s, %s, %s, %s)
-    """, (
-        initial_inr,
-        final_balance,
-        total_return,
-        max_loss,
-        json.dumps(dist),
-        "Hybrid PPO + LSTM (User Params)"
-    ))
+    """, (initial_inr, final_balance, total_return, max_loss, json.dumps(dist), "Hybrid PPO + LSTM"))
     conn.commit()
     cur.close()
     conn.close()
 
     return redirect(url_for("backtests"))
-
 
 @app.route("/backtests")
 def backtests():
@@ -308,20 +294,16 @@ def backtests():
     results = []
     for row in rows:
         timestamp, initial, final, ret, max_dd, notes, actions_json = row
-
-        # Super safe JSON parsing
-        dist = {"Hold": 0.0, "Long": 0.0, "Short": 0.0}  # Default safe dict
-
+        dist = {"Hold": 0.0, "Long": 0.0, "Short": 0.0}
         if actions_json:
             try:
                 parsed = json.loads(actions_json)
                 if isinstance(parsed, dict):
-                    # Update only valid keys
                     dist["Hold"] = float(parsed.get("Hold", 0.0))
                     dist["Long"] = float(parsed.get("Long", 0.0))
                     dist["Short"] = float(parsed.get("Short", 0.0))
-            except (json.JSONDecodeError, TypeError, ValueError):
-                pass  # Agar kuch galat hai to default hi rahega
+            except:
+                pass
 
         results.append({
             "timestamp": timestamp,
@@ -334,5 +316,6 @@ def backtests():
         })
 
     return render_template("backtest.html", results=results)
+
 if __name__ == "__main__":
     app.run(debug=True)
