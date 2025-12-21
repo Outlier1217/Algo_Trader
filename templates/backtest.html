@@ -65,6 +65,11 @@
         .pos { color: #22c55e; font-weight: 600; }
         .neg { color: #ef4444; font-weight: 600; }
 
+        .dist {
+            font-size: 13px;
+            color: #94a3b8;
+        }
+
         footer {
             text-align: center;
             padding: 20px;
@@ -83,33 +88,40 @@
 <main>
 
     <table>
-        <tr>
-            <th>Timestamp</th>
-            <th>Initial Balance</th>
-            <th>Final Balance</th>
-            <th>Return (%)</th>
-            <th>Max Drawdown (%)</th>
-            <th>Notes</th>
-        </tr>
+    <tr>
+        <th>Timestamp</th>
+        <th>Initial Balance</th>
+        <th>Final Balance</th>
+        <th>Return (%)</th>
+        <th>Max Drawdown (%)</th>
+        <th>Action Distribution</th>
+        <th>Notes</th>
+    </tr>
 
-        {% for r in results %}
-        <tr>
-            <td>{{ r[0] }}</td>
-            <td>{{ r[1] }}</td>
-            <td>{{ r[2] }}</td>
+    {% for r in results %}
+    <tr>
+        <td>{{ r.timestamp }}</td>
+        <td>{{ r.initial_balance }}</td>
+        <td>{{ r.final_balance }}</td>
 
-            {% if r[3] >= 0 %}
-                <td class="pos">{{ "%.2f"|format(r[3]) }}</td>
-            {% else %}
-                <td class="neg">{{ "%.2f"|format(r[3]) }}</td>
-            {% endif %}
+        {% if r.total_return >= 0 %}
+            <td class="pos">{{ "%.2f"|format(r.total_return) }}</td>
+        {% else %}
+            <td class="neg">{{ "%.2f"|format(r.total_return) }}</td>
+        {% endif %}
 
-            <td>{{ "%.2f"|format(r[4]) }}</td>
-            <td>{{ r[5] }}</td>
-        </tr>
-        {% endfor %}
-    </table>
+        <td>{{ "%.2f"|format(r.max_drawdown) }}</td>
 
+       <td class="dist">
+        Hold: {{ "%.1f"|format(r.dist.get('Hold', 0.0)) }}% |
+        Long: {{ "%.1f"|format(r.dist.get('Long', 0.0)) }}% |
+        Short: {{ "%.1f"|format(r.dist.get('Short', 0.0)) }}%
+        </td>
+
+        <td>{{ r.notes }}</td>
+    </tr>
+    {% endfor %}
+</table>
 </main>
 
 <footer>

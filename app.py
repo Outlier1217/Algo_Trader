@@ -253,12 +253,24 @@ def run_backtest():
     obs, _ = env.reset()
     done = False
 
+    actions = []  # Collect actions during backtest
+
     while not done:
         action, _ = ppo_model.predict(obs, deterministic=True)
         obs, reward, done, _, _ = env.step(int(action))
+        actions.append(int(action))  # Record the action
 
     final_balance = env.balance
     total_return = ((final_balance - initial_inr) / initial_inr) * 100
+
+    # Compute action distribution
+    if actions:
+        unique, counts = np.unique(actions, return_counts=True)
+        action_map = {0: 'Hold', 1: 'Long', 2: 'Short'}
+        total_actions = len(actions)
+        dist = {action_map.get(a, 'Unknown'): (c / total_actions * 100) for a, c in zip(unique, counts)}
+    else:
+        dist = {'Hold': 0, 'Long': 0, 'Short': 0}
 
     conn = get_db_conn()
     cur = conn.cursor()
@@ -271,7 +283,7 @@ def run_backtest():
         final_balance,
         total_return,
         max_loss,
-        json.dumps([]),
+        json.dumps(dist),
         "Hybrid PPO + LSTM (User Params)"
     ))
     conn.commit()
@@ -286,13 +298,41 @@ def backtests():
     conn = get_db_conn()
     cur = conn.cursor()
     cur.execute("""
-        SELECT timestamp, initial_balance, final_balance, total_return, max_drawdown, notes
+        SELECT timestamp, initial_balance, final_balance, total_return, max_drawdown, notes, actions_json
         FROM backtest_results ORDER BY timestamp DESC
     """)
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return render_template("backtest.html", results=rows)
 
+    results = []
+    for row in rows:
+        timestamp, initial, final, ret, max_dd, notes, actions_json = row
+
+        # Super safe JSON parsing
+        dist = {"Hold": 0.0, "Long": 0.0, "Short": 0.0}  # Default safe dict
+
+        if actions_json:
+            try:
+                parsed = json.loads(actions_json)
+                if isinstance(parsed, dict):
+                    # Update only valid keys
+                    dist["Hold"] = float(parsed.get("Hold", 0.0))
+                    dist["Long"] = float(parsed.get("Long", 0.0))
+                    dist["Short"] = float(parsed.get("Short", 0.0))
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass  # Agar kuch galat hai to default hi rahega
+
+        results.append({
+            "timestamp": timestamp,
+            "initial_balance": initial,
+            "final_balance": final,
+            "total_return": ret,
+            "max_drawdown": max_dd,
+            "notes": notes,
+            "dist": dist
+        })
+
+    return render_template("backtest.html", results=results)
 if __name__ == "__main__":
     app.run(debug=True)
