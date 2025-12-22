@@ -166,6 +166,116 @@
             color: #fee2e2;
             font-size: 14px;
         }
+
+
+        /* ---------------- MOBILE OPTIMIZATION ---------------- */
+
+@media (max-width: 768px) {
+
+    header {
+        padding: 16px 20px;
+    }
+
+    header h1 {
+        font-size: 18px;
+    }
+
+    main {
+        margin: 20px auto;
+        padding: 0 14px;
+    }
+
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .card {
+        padding: 18px;
+    }
+
+    .price {
+        font-size: 26px;
+    }
+
+    .signal {
+        font-size: 20px;
+    }
+
+    form {
+        grid-template-columns: 1fr;
+    }
+
+    .full {
+        grid-column: span 1;
+    }
+
+    button {
+        width: 100%;
+    }
+
+    .note {
+        font-size: 14px;
+    }
+
+    .disclaimer {
+        padding: 14px;
+        font-size: 14px;
+    }
+
+    footer {
+        font-size: 12px;
+    }
+}
+
+/* Better links for touch devices */
+a {
+    color: #38bdf8;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.header-icons {
+    display: flex;
+    gap: 14px;
+}
+
+.header-icons a svg {
+    width: 22px;
+    height: 22px;
+    fill: #94a3b8;
+    transition: all 0.2s ease;
+}
+
+.header-icons a:hover svg {
+    fill: #38bdf8;
+    transform: scale(1.1);
+}
+
+/* Mobile adjustment */
+@media (max-width: 768px) {
+    .header-top {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .header-icons {
+        margin-top: 6px;
+    }
+}
+
+
     </style>
 </head>
 <body>
@@ -183,8 +293,28 @@
         </p>
     </div>
 
+    <div class="header-top">
     <h1>🚀 Algo Trader — Bitcoin AI Model</h1>
-    <span class="muted">Hybrid PPO + LSTM System</span>
+
+    <div class="header-icons">
+        <a href="https://www.youtube.com/@Outlier1217" target="_blank" title="YouTube Channel">
+            <!-- YouTube Icon -->
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M23.5 6.2s-.2-1.6-.9-2.3c-.9-.9-1.9-.9-2.4-1C16.8 2.5 12 2.5 12 2.5h0s-4.8 0-8.2.4c-.5.1-1.5.1-2.4 1C.7 4.6.5 6.2.5 6.2S0 8.1 0 10v1.9c0 1.9.5 3.8.5 3.8s.2 1.6.9 2.3c.9.9 2.1.9 2.6 1 1.9.2 8 .4 8 .4s4.8 0 8.2-.4c.5-.1 1.5-.1 2.4-1 .7-.7.9-2.3.9-2.3s.5-1.9.5-3.8V10c0-1.9-.5-3.8-.5-3.8zM9.5 14.8V7.9l6.2 3.5-6.2 3.4z"/>
+            </svg>
+        </a>
+
+        <a href="https://github.com/Outlier1217?tab=repositories" target="_blank" title="GitHub Repositories">
+            <!-- GitHub Icon -->
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2.2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.2-1.2-1.6-1.2-1.6-1-.7.1-.7.1-.7 1.1.1 1.7 1.1 1.7 1.1 1 .1.8 1.8 2.7 2.5.3-.7.7-1.1 1.2-1.4-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.4 1.1-3.2-.1-.3-.5-1.5.1-3.1 0 0 .9-.3 3 .1.9-.3 1.8-.4 2.7-.4s1.8.1 2.7.4c2.1-.4 3-.1 3-.1.6 1.6.2 2.8.1 3.1.7.8 1.1 1.9 1.1 3.2 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1 .8 2.1v3.1c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/>
+            </svg>
+        </a>
+    </div>
+</div>
+
+<span class="muted">Hybrid PPO + LSTM System</span>
+
 
 </header>
 
@@ -245,6 +375,59 @@
                 </div>
             </form>
         </div>
+
+
+
+<!-- RESOURCES & LINKS -->
+<div class="card full">
+    <h2>🔗 Project Resources & Links</h2>
+
+    <div class="note">
+        <p><strong>📌 Complete Source Code (GitHub):</strong><br>
+            <a href="https://github.com/Outlier1217?tab=repositories" target="_blank">
+                https://github.com/Outlier1217
+            </a>
+        </p>
+
+        <p><strong>📌 Kaggle Profile:</strong><br>
+            <a href="https://www.kaggle.com/work" target="_blank">
+                https://www.kaggle.com/work
+            </a>
+        </p>
+
+        <p><strong>📌 Official Website:</strong><br>
+            <a href="https://outlier.co.in/" target="_blank">
+                https://outlier.co.in
+            </a>
+        </p>
+
+        <p><strong>📌 Detailed Code Explanation on YouTube:</strong><br>
+            <a href="https://youtu.be/fkgXOMCJARg?si=BrDNmJC_afIA2dhx" target="_blank">
+                Watch Full Code Walkthrough
+            </a>
+        </p>
+
+        <hr style="border: 1px dashed var(--border); margin: 16px 0;">
+
+        <p><strong>⏱️ Timeline – Review of Other AI/ML Models:</strong></p>
+
+        <ul class="muted" style="line-height: 1.8; padding-left: 18px;">
+            <li><strong>45:00</strong> – HDFC Bank Price Prediction (Reinforcement Learning)</li>
+            <li><strong>50:03</strong> – Bitcoin & Ethereum Prediction (LSTM)</li>
+            <li><strong>53:47</strong> – Nifty 50 & Bank Nifty Prediction (LSTM)</li>
+            <li><strong>56:56</strong> – Pump & Dump Detection (Solana Tokens)</li>
+        </ul>
+
+        <p><strong>📌 Full Review Video:</strong><br>
+            <a href="https://youtu.be/fkgXOMCJARg?si=BrDNmJC_afIA2dhx" target="_blank">
+                Watch Complete Model Review
+            </a>
+        </p>
+    </div>
+</div>
+
+
+
 
         <!-- Model Explanation -->
         <div class="card full">

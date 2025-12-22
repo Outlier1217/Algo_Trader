@@ -76,8 +76,128 @@
             color: #94a3b8;
             font-size: 13px;
         }
+
+        /* ---------------- MOBILE OPTIMIZATION ---------------- */
+
+@media (max-width: 768px) {
+
+    header {
+        padding: 16px 20px;
+    }
+
+    header h1 {
+        font-size: 18px;
+    }
+
+    main {
+        margin: 20px auto;
+        padding: 0 14px;
+    }
+
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .card {
+        padding: 18px;
+    }
+
+    .price {
+        font-size: 26px;
+    }
+
+    .signal {
+        font-size: 20px;
+    }
+
+    form {
+        grid-template-columns: 1fr;
+    }
+
+    .full {
+        grid-column: span 1;
+    }
+
+    button {
+        width: 100%;
+    }
+
+    .note {
+        font-size: 14px;
+    }
+
+    .disclaimer {
+        padding: 14px;
+        font-size: 14px;
+    }
+
+    footer {
+        font-size: 12px;
+    }
+}
+
+/* Better links for touch devices */
+a {
+    color: #38bdf8;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
     </style>
 </head>
+
+<!-- RESOURCES & LINKS -->
+<div class="card full">
+    <h2>🔗 Project Resources & Links</h2>
+
+    <div class="note">
+        <p><strong>📌 Complete Source Code (GitHub):</strong><br>
+            <a href="https://github.com/Outlier1217?tab=repositories" target="_blank">
+                https://github.com/Outlier1217
+            </a>
+        </p>
+
+        <p><strong>📌 Kaggle Profile:</strong><br>
+            <a href="https://www.kaggle.com/work" target="_blank">
+                https://www.kaggle.com/work
+            </a>
+        </p>
+
+        <p><strong>📌 Official Website:</strong><br>
+            <a href="https://outlier.co.in/" target="_blank">
+                https://outlier.co.in
+            </a>
+        </p>
+
+        <p><strong>📌 Detailed Code Explanation on YouTube:</strong><br>
+            <a href="https://youtu.be/fkgXOMCJARg?si=BrDNmJC_afIA2dhx" target="_blank">
+                Watch Full Code Walkthrough
+            </a>
+        </p>
+
+        <hr style="border: 1px dashed var(--border); margin: 16px 0;">
+
+        <p><strong>⏱️ Timeline – Review of Other AI/ML Models:</strong></p>
+
+        <ul class="muted" style="line-height: 1.8; padding-left: 18px;">
+            <li><strong>45:00</strong> – HDFC Bank Price Prediction (Reinforcement Learning)</li>
+            <li><strong>50:03</strong> – Bitcoin & Ethereum Prediction (LSTM)</li>
+            <li><strong>53:47</strong> – Nifty 50 & Bank Nifty Prediction (LSTM)</li>
+            <li><strong>56:56</strong> – Pump & Dump Detection (Solana Tokens)</li>
+        </ul>
+
+        <p><strong>📌 Full Review Video:</strong><br>
+            <a href="https://youtu.be/fkgXOMCJARg?si=BrDNmJC_afIA2dhx" target="_blank">
+                Watch Complete Model Review
+            </a>
+        </p>
+    </div>
+</div>
+
 <body>
 
 <header>
